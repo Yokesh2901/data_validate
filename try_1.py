@@ -2,20 +2,22 @@ import streamlit as st
 import pandas as pd
 import re
 
-# Function to validate data
+# Function to validate data for a single row
 def validate_data(row, serial_numbers):
     errors = []
     
     # Check for missing values
-    if pd.isnull(row['DOB']):
-        errors.append("DOB is missing")
-    if pd.isnull(row['father_name']):
-        errors.append("Father's name is missing")
-    if pd.isnull(row['serial_number']):
-        errors.append("Serial number is missing")
-    if pd.isnull(row['qualification']):
-        errors.append("Qualification is missing")
+    missing_values = {
+        'DOB': "DOB is missing",
+        'father_name': "Father's name is missing",
+        'serial_number': "Serial number is missing",
+        'qualification': "Qualification is missing"
+    }
     
+    for column, error_message in missing_values.items():
+        if pd.isnull(row[column]):
+            errors.append(error_message)
+
     # Validate DOB format (date format check)
     if not pd.isnull(row['DOB']):
         try:
@@ -23,7 +25,7 @@ def validate_data(row, serial_numbers):
         except Exception:
             errors.append("DOB format is incorrect, should be YYYY-MM-DD")
     
-    # Validate serial number (should be numeric)
+    # Validate serial number
     if not pd.isnull(row['serial_number']):
         if not str(row['serial_number']).isdigit():
             errors.append("Serial number must be numeric")
@@ -31,6 +33,13 @@ def validate_data(row, serial_numbers):
             errors.append("Serial number must be unique")
         else:
             serial_numbers.add(row['serial_number'])
+
+    # Validate qualification (should be a string with only alphabets)
+    if isinstance(row['qualification'], str):
+        if not re.match(r'^[a-zA-Z]+$', row['qualification']):
+            errors.append("Qualification must only contain alphabetic characters")
+    else:
+        errors.append("Qualification must be a string")
     
     return errors
 
@@ -38,23 +47,24 @@ def validate_data(row, serial_numbers):
 def main():
     st.title("Employee Data Input and Validation")
 
-    # Upload file
+    # File upload
     uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx"])
     if uploaded_file:
         df = pd.read_excel(uploaded_file)
 
-        # Initialize a set to keep track of serial numbers
+        # Initialize a set to track unique serial numbers
         serial_numbers = set()
 
-        # Add a column to track validation errors
+        # Apply validation function and track errors
         df['errors'] = df.apply(lambda row: validate_data(row, serial_numbers), axis=1)
 
-        # Display invalid rows
-        invalid_rows = df[df['errors'].apply(lambda x: len(x) > 0)]
+        # Filter out invalid rows
+        invalid_rows = df[df['errors'].apply(len) > 0]
         
+        # Display results
         if not invalid_rows.empty:
             st.write("Invalid data found in the following rows:")
-            st.write(invalid_rows[['DOB', 'father_name', 'serial_number', 'qualification', 'errors']])
+            st.dataframe(invalid_rows[['DOB', 'father_name', 'serial_number', 'qualification', 'errors']])
         else:
             st.success("All data is valid.")
 
